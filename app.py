@@ -9,113 +9,158 @@ from qiskit.quantum_info import Statevector
 import networkx as nx
 from pyvis.network import Network
 import tempfile
-import os
 
-# ----------------------------------------
+# ------------------------------------------------------
 # PAGE CONFIG
-# ----------------------------------------
+# ------------------------------------------------------
 
 st.set_page_config(
-    page_title="Quantum Encryption Demo",
+    page_title="Quantum Encryption Lab",
     page_icon="🔐",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ----------------------------------------
-# CUSTOM CSS
-# ----------------------------------------
+# ------------------------------------------------------
+# CUSTOM STYLING
+# ------------------------------------------------------
 
 st.markdown(
     """
     <style>
+
     .stApp {
-        background: linear-gradient(135deg, #050816, #0b1026);
+        background: linear-gradient(135deg,#020617,#0f172a,#111827);
         color: white;
     }
 
-    .title {
-        font-size: 60px;
-        font-weight: 900;
+    .main-title {
         text-align: center;
-        color: #00F5FF;
+        font-size: 4rem;
+        font-weight: 900;
+        color: #22d3ee;
         text-shadow: 0px 0px 25px cyan;
+        margin-bottom: 10px;
     }
 
     .subtitle {
         text-align: center;
-        font-size: 22px;
-        color: #B8C1EC;
-        margin-bottom: 30px;
+        color: #cbd5e1;
+        font-size: 1.2rem;
+        margin-bottom: 40px;
     }
 
-    .metric-card {
+    .feature-box {
         background: rgba(255,255,255,0.05);
-        border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
         padding: 20px;
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 0 15px rgba(0,255,255,0.2);
+        box-shadow: 0px 0px 15px rgba(34,211,238,0.15);
     }
 
-    .protocol-box {
-        background: rgba(0,255,255,0.05);
-        border-radius: 15px;
-        padding: 15px;
-        margin-top: 15px;
-        border-left: 4px solid cyan;
+    .info-box {
+        background: rgba(34,211,238,0.08);
+        border-left: 5px solid cyan;
+        border-radius: 12px;
+        padding: 18px;
+        margin-top: 10px;
+        margin-bottom: 10px;
     }
+
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# ----------------------------------------
-# TITLE
-# ----------------------------------------
+# ------------------------------------------------------
+# HEADER
+# ------------------------------------------------------
 
-st.markdown('<div class="title">🔐 Quantum Encryption Demo</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🔐 Quantum Encryption Lab</div>', unsafe_allow_html=True)
+
 st.markdown(
-    '<div class="subtitle">BB84 Quantum Key Distribution Visualizer with Eavesdropping Detection</div>',
+    '<div class="subtitle">Interactive BB84 Quantum Key Distribution Simulator with Real-Time Eavesdropping Detection</div>',
     unsafe_allow_html=True
 )
 
-# ----------------------------------------
-# SIDEBAR CONTROLS
-# ----------------------------------------
+# ------------------------------------------------------
+# INTRODUCTION
+# ------------------------------------------------------
 
-st.sidebar.title("⚙ Simulation Controls")
+with st.expander("📘 What does this simulator do?"):
+    st.markdown(
+        """
+        This simulator demonstrates the **BB84 Quantum Key Distribution Protocol**, one of the first quantum encryption methods.
 
-num_bits = st.sidebar.slider("Number of Qubits", 8, 128, 32)
+        ### How it works:
+        1. Alice creates random quantum bits.
+        2. These qubits travel through a quantum channel.
+        3. Bob measures them using random bases.
+        4. If Eve (an eavesdropper) intercepts the qubits, the quantum states change.
+        5. The system detects the disturbance automatically.
 
-eavesdrop = st.sidebar.toggle("Enable Eavesdropper (Eve)", value=True)
+        ### Why this matters:
+        Quantum encryption enables communication systems where spying attempts become physically detectable.
+        """
+    )
 
-simulate = st.sidebar.button("🚀 Run Simulation")
+# ------------------------------------------------------
+# SIDEBAR
+# ------------------------------------------------------
 
-# ----------------------------------------
+st.sidebar.title("⚙ Simulation Settings")
+
+num_bits = st.sidebar.slider(
+    "Number of Qubits",
+    min_value=8,
+    max_value=128,
+    value=32,
+    help="Controls how many quantum bits are transmitted"
+)
+
+simulation_mode = st.sidebar.selectbox(
+    "Simulation Mode",
+    [
+        "Secure Transmission",
+        "Eavesdropping Attack"
+    ]
+)
+
+simulate = st.sidebar.button("🚀 Launch Quantum Simulation", use_container_width=True)
+
+# ------------------------------------------------------
 # QUANTUM PROCESSOR STATUS
-# ----------------------------------------
+# ------------------------------------------------------
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚛ Quantum Processor")
 
-cpu_load = random.randint(42, 97)
-coherence = random.randint(68, 99)
+cpu_load = random.randint(40, 97)
+coherence = random.randint(70, 99)
+noise = random.randint(1, 18)
 
+st.sidebar.caption("Quantum Core Utilization")
 st.sidebar.progress(cpu_load / 100)
-st.sidebar.caption(f"Quantum Core Utilization: {cpu_load}%")
 
+st.sidebar.caption("Qubit Coherence Stability")
 st.sidebar.progress(coherence / 100)
-st.sidebar.caption(f"Qubit Coherence Stability: {coherence}%")
 
-# ----------------------------------------
-# BB84 FUNCTIONS
-# ----------------------------------------
+st.sidebar.caption("Noise Suppression")
+st.sidebar.progress((100 - noise) / 100)
+
+# ------------------------------------------------------
+# FUNCTIONS
+# ------------------------------------------------------
+
 
 def generate_bits(n):
     return np.random.randint(0, 2, n)
 
 
+
 def generate_bases(n):
     return np.random.choice(['+', 'x'], n)
+
 
 
 def encode_qubits(bits, bases):
@@ -135,45 +180,49 @@ def encode_qubits(bits, bases):
     return qubits
 
 
+
 def measure_qubits(qubits, bases):
     results = []
 
     for qc, base in zip(qubits, bases):
-        qc_copy = qc.copy()
+        temp_qc = qc.copy()
 
         if base == 'x':
-            qc_copy.h(0)
+            temp_qc.h(0)
 
-        state = Statevector.from_instruction(qc_copy)
+        state = Statevector.from_instruction(temp_qc)
         probs = state.probabilities()
 
-        result = np.random.choice([0, 1], p=probs)
-        results.append(result)
+        measurement = np.random.choice([0, 1], p=probs)
+        results.append(measurement)
 
     return np.array(results)
 
-
-# ----------------------------------------
-# RUN SIMULATION
-# ----------------------------------------
+# ------------------------------------------------------
+# MAIN SIMULATION
+# ------------------------------------------------------
 
 if simulate:
 
+    eavesdrop = simulation_mode == "Eavesdropping Attack"
+
+    # Alice
     alice_bits = generate_bits(num_bits)
     alice_bases = generate_bases(num_bits)
 
     qubits = encode_qubits(alice_bits, alice_bases)
 
-    # Eve intercepts
+    # Eve
     if eavesdrop:
         eve_bases = generate_bases(num_bits)
         eve_results = measure_qubits(qubits, eve_bases)
-
         qubits = encode_qubits(eve_results, eve_bases)
 
+    # Bob
     bob_bases = generate_bases(num_bits)
     bob_results = measure_qubits(qubits, bob_bases)
 
+    # Shared Key
     matching = alice_bases == bob_bases
 
     shared_key_alice = alice_bits[matching]
@@ -181,33 +230,38 @@ if simulate:
 
     errors = np.sum(shared_key_alice != shared_key_bob)
 
-    error_rate = (errors / len(shared_key_alice)) * 100 if len(shared_key_alice) > 0 else 0
+    error_rate = (
+        (errors / len(shared_key_alice)) * 100
+        if len(shared_key_alice) > 0 else 0
+    )
 
-    security_status = "⚠ Eavesdropping Detected" if error_rate > 15 else "✅ Secure Channel"
+    secure = error_rate < 15
 
-    # ----------------------------------------
+    # ------------------------------------------------------
+    # STATUS BANNER
+    # ------------------------------------------------------
+
+    if secure:
+        st.success("✅ Secure quantum communication established successfully.")
+    else:
+        st.error("⚠ Quantum disturbance detected — possible eavesdropping attack.")
+
+    # ------------------------------------------------------
     # METRICS
-    # ----------------------------------------
+    # ------------------------------------------------------
 
     c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
-        st.metric("Shared Key Length", len(shared_key_alice))
+    c1.metric("Shared Key Length", len(shared_key_alice))
+    c2.metric("Detected Errors", int(errors))
+    c3.metric("Error Rate", f"{error_rate:.2f}%")
+    c4.metric("Security", "SECURE" if secure else "COMPROMISED")
 
-    with c2:
-        st.metric("Errors Detected", errors)
+    # ------------------------------------------------------
+    # PROBABILITY GRAPH
+    # ------------------------------------------------------
 
-    with c3:
-        st.metric("Error Rate", f"{error_rate:.2f}%")
-
-    with c4:
-        st.metric("Security Status", security_status)
-
-    # ----------------------------------------
-    # QUANTUM STATE VISUALIZATION
-    # ----------------------------------------
-
-    st.markdown("## 🌌 Quantum Probability Visualization")
+    st.markdown("## 🌌 Quantum Probability States")
 
     probabilities = []
 
@@ -223,69 +277,27 @@ if simulate:
             x=[f"Q{i}" for i in range(len(probabilities))],
             y=probabilities,
             text=[f"{p:.2f}" for p in probabilities],
-            textposition='outside'
+            textposition="outside"
         )
     )
 
     fig.update_layout(
-        title="Probability of Measuring |1⟩",
         template="plotly_dark",
-        height=500,
+        title="Probability of Measuring Quantum State |1⟩",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(size=16)
+        height=500
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ----------------------------------------
-    # QUANTUM NETWORK MAP
-    # ----------------------------------------
+    # ------------------------------------------------------
+    # THREAT METER
+    # ------------------------------------------------------
 
-    st.markdown("## 🌐 Quantum Communication Network")
+    st.markdown("## 🚨 Quantum Threat Analysis")
 
-    G = nx.Graph()
-
-    G.add_node("Alice")
-    G.add_node("Quantum Channel")
-    G.add_node("Bob")
-
-    if eavesdrop:
-        G.add_node("Eve")
-        G.add_edge("Alice", "Eve")
-        G.add_edge("Eve", "Quantum Channel")
-    else:
-        G.add_edge("Alice", "Quantum Channel")
-
-    G.add_edge("Quantum Channel", "Bob")
-
-    net = Network(
-        height="500px",
-        width="100%",
-        bgcolor="#050816",
-        font_color="white"
-    )
-
-    for node in G.nodes:
-        net.add_node(node, label=node)
-
-    for edge in G.edges:
-        net.add_edge(edge[0], edge[1])
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
-        net.save_graph(tmpfile.name)
-
-        html_content = open(tmpfile.name, 'r', encoding='utf-8').read()
-
-    components.html(html_content, height=550)
-
-    # ----------------------------------------
-    # THREAT LEVEL METER
-    # ----------------------------------------
-
-    st.markdown("## 🚨 Quantum Threat Meter")
-
-    threat_fig = go.Figure(go.Indicator(
+    gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=error_rate,
         title={'text': "Threat Level"},
@@ -295,46 +307,10 @@ if simulate:
             'steps': [
                 {'range': [0, 10], 'color': '#00ff99'},
                 {'range': [10, 20], 'color': '#ffaa00'},
-                {'range': [20, 30], 'color': '#ff0055'}
+                {'range': [20, 30], 'color': '#ff004c'}
             ]
         }
     ))
 
-    threat_fig.update_layout(
-        template="plotly_dark",
-        height=400,
-        paper_bgcolor='rgba(0,0,0,0)',
-    )
-
-    st.plotly_chart(threat_fig, use_container_width=True)
-
-    # ----------------------------------------
-    # DATA TABLE
-    # ----------------------------------------
-
-    st.markdown("## 📡 Protocol Transmission Data")
-
-    df = pd.DataFrame({
-        "Alice Bits": alice_bits,
-        "Alice Bases": alice_bases,
-        "Bob Bases": bob_bases,
-        "Bob Results": bob_results,
-        "Basis Match": matching
-    })
-
-    st.dataframe(df, use_container_width=True)
-
-    # ----------------------------------------
-    # KEY STABILITY VISUALIZATION
-    # ----------------------------------------
-
-    st.markdown("## 📈 Shared Key Stability")
-
-    key_match_progress = []
-    correct = 0
-
-    for i in range(len(shared_key_alice)):
-        if shared_key_alice[i] == shared_key_bob[i]:
-            correct += 1
-
-   
+    gauge.update_layout(
+     
