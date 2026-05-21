@@ -1,316 +1,288 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 import random
 import plotly.graph_objects as go
+import streamlit.components.v1 as components
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Statevector
 import networkx as nx
 from pyvis.network import Network
 import tempfile
 
-# ------------------------------------------------------
+# ----------------------------
 # PAGE CONFIG
-# ------------------------------------------------------
+# ----------------------------
 
 st.set_page_config(
     page_title="Quantum Encryption Lab",
     page_icon="🔐",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# ------------------------------------------------------
-# CUSTOM STYLING
-# ------------------------------------------------------
+# ----------------------------
+# GLOBAL CSS (fix overflow + clean UI)
+# ----------------------------
 
 st.markdown(
-    """
-    <style>
+"""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #050816, #0b1026, #0f172a);
+    color: white;
+    overflow-x: hidden;
+}
 
-    .stApp {
-        background: linear-gradient(135deg,#020617,#0f172a,#111827);
-        color: white;
-    }
+.block-container {
+    padding-top: 2rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 1200px;
+}
 
-    .main-title {
-        text-align: center;
-        font-size: 4rem;
-        font-weight: 900;
-        color: #22d3ee;
-        text-shadow: 0px 0px 25px cyan;
-        margin-bottom: 10px;
-    }
+h1, h2, h3 {
+    color: #22d3ee;
+}
 
-    .subtitle {
-        text-align: center;
-        color: #cbd5e1;
-        font-size: 1.2rem;
-        margin-bottom: 40px;
-    }
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+}
 
-    .feature-box {
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 18px;
-        padding: 20px;
-        box-shadow: 0px 0px 15px rgba(34,211,238,0.15);
-    }
-
-    .info-box {
-        background: rgba(34,211,238,0.08);
-        border-left: 5px solid cyan;
-        border-radius: 12px;
-        padding: 18px;
-        margin-top: 10px;
-        margin-bottom: 10px;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
+.small {
+    font-size: 0.95rem;
+    color: #cbd5e1;
+}
+</style>
+""",
+unsafe_allow_html=True
 )
 
-# ------------------------------------------------------
+# ----------------------------
 # HEADER
-# ------------------------------------------------------
+# ----------------------------
 
-st.markdown('<div class="main-title">🔐 Quantum Encryption Lab</div>', unsafe_allow_html=True)
+st.title("🔐 Quantum Encryption Lab")
+st.caption("BB84 Quantum Key Distribution Simulator — with Real-World Cybersecurity Simulation")
 
-st.markdown(
-    '<div class="subtitle">Interactive BB84 Quantum Key Distribution Simulator with Real-Time Eavesdropping Detection</div>',
-    unsafe_allow_html=True
-)
+# ----------------------------
+# INTRO
+# ----------------------------
 
-# ------------------------------------------------------
-# INTRODUCTION
-# ------------------------------------------------------
+with st.expander("📘 What is this project?"):
+    st.write("""
+    This simulator demonstrates how quantum encryption (BB84 protocol) protects communication.
 
-with st.expander("📘 What does this simulator do?"):
-    st.markdown(
-        """
-        This simulator demonstrates the **BB84 Quantum Key Distribution Protocol**, one of the first quantum encryption methods.
+    It simulates:
+    - Alice sending quantum bits
+    - Bob receiving them
+    - Optional attacker (Eve)
+    - Detection of interception via quantum disturbance
 
-        ### How it works:
-        1. Alice creates random quantum bits.
-        2. These qubits travel through a quantum channel.
-        3. Bob measures them using random bases.
-        4. If Eve (an eavesdropper) intercepts the qubits, the quantum states change.
-        5. The system detects the disturbance automatically.
+    ⚠ Real-world analogy: Banking transactions (SWIFT system) or secure military communication.
+    """)
 
-        ### Why this matters:
-        Quantum encryption enables communication systems where spying attempts become physically detectable.
-        """
-    )
+# ----------------------------
+# USER INPUTS (NO SIDEBAR)
+# ----------------------------
 
-# ------------------------------------------------------
-# SIDEBAR
-# ------------------------------------------------------
+st.markdown("## ⚙ Simulation Controls")
 
-st.sidebar.title("⚙ Simulation Settings")
+col1, col2, col3 = st.columns(3)
 
-num_bits = st.sidebar.slider(
-    "Number of Qubits",
-    min_value=8,
-    max_value=128,
-    value=32,
-    help="Controls how many quantum bits are transmitted"
-)
+with col1:
+    num_bits = st.slider("Number of Qubits", 8, 128, 32)
 
-simulation_mode = st.sidebar.selectbox(
-    "Simulation Mode",
-    [
-        "Secure Transmission",
-        "Eavesdropping Attack"
-    ]
-)
+with col2:
+    mode = st.radio("Mode", ["Secure Channel", "Banking Attack Simulation (Eve Intercepts)"])
 
-simulate = st.sidebar.button("🚀 Launch Quantum Simulation", use_container_width=True)
+with col3:
+    run = st.button("🚀 Run Simulation")
 
-# ------------------------------------------------------
-# QUANTUM PROCESSOR STATUS
-# ------------------------------------------------------
+# ----------------------------
+# REAL-WORLD CONTEXT BOX
+# ----------------------------
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("⚛ Quantum Processor")
+st.markdown("## 🌍 Real-World Scenario")
 
-cpu_load = random.randint(40, 97)
-coherence = random.randint(70, 99)
-noise = random.randint(1, 18)
+st.info("""
+Imagine a global bank sending encrypted transaction keys between branches.
 
-st.sidebar.caption("Quantum Core Utilization")
-st.sidebar.progress(cpu_load / 100)
+If a hacker intercepts classical encryption → data is copied silently.
 
-st.sidebar.caption("Qubit Coherence Stability")
-st.sidebar.progress(coherence / 100)
+If quantum encryption is used → interception is detected immediately due to state disturbance.
+""")
 
-st.sidebar.caption("Noise Suppression")
-st.sidebar.progress((100 - noise) / 100)
+# ----------------------------
+# QUANTUM FUNCTIONS
+# ----------------------------
 
-# ------------------------------------------------------
-# FUNCTIONS
-# ------------------------------------------------------
-
-
-def generate_bits(n):
+def bits(n):
     return np.random.randint(0, 2, n)
 
-
-
-def generate_bases(n):
+def bases(n):
     return np.random.choice(['+', 'x'], n)
 
-
-
-def encode_qubits(bits, bases):
-    qubits = []
-
-    for bit, base in zip(bits, bases):
+def encode(bits_arr, base_arr):
+    q = []
+    for b, base in zip(bits_arr, base_arr):
         qc = QuantumCircuit(1)
-
-        if bit == 1:
+        if b == 1:
             qc.x(0)
-
         if base == 'x':
             qc.h(0)
+        q.append(qc)
+    return q
 
-        qubits.append(qc)
-
-    return qubits
-
-
-
-def measure_qubits(qubits, bases):
-    results = []
-
-    for qc, base in zip(qubits, bases):
-        temp_qc = qc.copy()
-
+def measure(qc_list, base_arr):
+    res = []
+    for qc, base in zip(qc_list, base_arr):
+        temp = qc.copy()
         if base == 'x':
-            temp_qc.h(0)
-
-        state = Statevector.from_instruction(temp_qc)
+            temp.h(0)
+        state = Statevector.from_instruction(temp)
         probs = state.probabilities()
+        res.append(np.random.choice([0,1], p=probs))
+    return np.array(res)
 
-        measurement = np.random.choice([0, 1], p=probs)
-        results.append(measurement)
+# ----------------------------
+# RUN SIMULATION
+# ----------------------------
 
-    return np.array(results)
+if run:
 
-# ------------------------------------------------------
-# MAIN SIMULATION
-# ------------------------------------------------------
+    eve = (mode != "Secure Channel")
 
-if simulate:
+    alice_b = bits(num_bits)
+    alice_base = bases(num_bits)
 
-    eavesdrop = simulation_mode == "Eavesdropping Attack"
+    qubits = encode(alice_b, alice_base)
 
-    # Alice
-    alice_bits = generate_bits(num_bits)
-    alice_bases = generate_bases(num_bits)
+    if eve:
+        eve_base = bases(num_bits)
+        eve_res = measure(qubits, eve_base)
+        qubits = encode(eve_res, eve_base)
 
-    qubits = encode_qubits(alice_bits, alice_bases)
+    bob_base = bases(num_bits)
+    bob_res = measure(qubits, bob_base)
 
-    # Eve
-    if eavesdrop:
-        eve_bases = generate_bases(num_bits)
-        eve_results = measure_qubits(qubits, eve_bases)
-        qubits = encode_qubits(eve_results, eve_bases)
+    match = alice_base == bob_base
 
-    # Bob
-    bob_bases = generate_bases(num_bits)
-    bob_results = measure_qubits(qubits, bob_bases)
+    alice_key = alice_b[match]
+    bob_key = bob_res[match]
 
-    # Shared Key
-    matching = alice_bases == bob_bases
+    errors = np.sum(alice_key != bob_key)
 
-    shared_key_alice = alice_bits[matching]
-    shared_key_bob = bob_results[matching]
-
-    errors = np.sum(shared_key_alice != shared_key_bob)
-
-    error_rate = (
-        (errors / len(shared_key_alice)) * 100
-        if len(shared_key_alice) > 0 else 0
-    )
+    error_rate = (errors / len(alice_key)) * 100 if len(alice_key) else 0
 
     secure = error_rate < 15
 
-    # ------------------------------------------------------
-    # STATUS BANNER
-    # ------------------------------------------------------
+    # ----------------------------
+    # RESULT BANNER
+    # ----------------------------
 
     if secure:
-        st.success("✅ Secure quantum communication established successfully.")
+        st.success("✔ Secure Quantum Channel Established")
     else:
-        st.error("⚠ Quantum disturbance detected — possible eavesdropping attack.")
+        st.error("⚠ Attack Detected: Quantum State Disturbance Found")
 
-    # ------------------------------------------------------
+    # ----------------------------
     # METRICS
-    # ------------------------------------------------------
+    # ----------------------------
 
-    c1, c2, c3, c4 = st.columns(4)
+    m1, m2, m3, m4 = st.columns(4)
 
-    c1.metric("Shared Key Length", len(shared_key_alice))
-    c2.metric("Detected Errors", int(errors))
-    c3.metric("Error Rate", f"{error_rate:.2f}%")
-    c4.metric("Security", "SECURE" if secure else "COMPROMISED")
+    m1.metric("Key Length", len(alice_key))
+    m2.metric("Errors", int(errors))
+    m3.metric("Error Rate", f"{error_rate:.2f}%")
+    m4.metric("Security", "SAFE" if secure else "BREACHED")
 
-    # ------------------------------------------------------
-    # PROBABILITY GRAPH
-    # ------------------------------------------------------
+    # ----------------------------
+    # REAL-WORLD RISK ANALYSIS (IMPROVED)
+    # ----------------------------
 
-    st.markdown("## 🌌 Quantum Probability States")
+    st.markdown("## 🏦 Banking Security Risk Analysis")
 
-    probabilities = []
+    if eve:
+        st.warning("""
+        A cyber attacker intercepted quantum-encrypted banking keys.
 
+        ✔ System response:
+        - Interception detected
+        - Transaction halted automatically
+        - Key regenerated
+
+        💡 In classical systems, this attack would go unnoticed.
+        """)
+    else:
+        st.success("""
+        No intrusion detected.
+        Banking transactions remain fully secure.
+        """)
+
+    # ----------------------------
+    # PROBABILITY VISUAL
+    # ----------------------------
+
+    st.markdown("## 📊 Quantum State Behavior")
+
+    probs = []
     for i in range(min(16, len(qubits))):
         state = Statevector.from_instruction(qubits[i])
-        probs = state.probabilities()
-        probabilities.append(probs[1])
+        probs.append(state.probabilities()[1])
 
     fig = go.Figure()
-
-    fig.add_trace(
-        go.Bar(
-            x=[f"Q{i}" for i in range(len(probabilities))],
-            y=probabilities,
-            text=[f"{p:.2f}" for p in probabilities],
-            textposition="outside"
-        )
-    )
-
-    fig.update_layout(
-        template="plotly_dark",
-        title="Probability of Measuring Quantum State |1⟩",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        height=500
-    )
-
+    fig.add_trace(go.Bar(y=probs, x=[f"Q{i}" for i in range(len(probs))]))
+    fig.update_layout(template="plotly_dark", height=400)
     st.plotly_chart(fig, use_container_width=True)
 
-    # ------------------------------------------------------
-    # THREAT METER
-    # ------------------------------------------------------
+    # ----------------------------
+    # NETWORK VISUAL (FIXED WIDTH OVERFLOW)
+    # ----------------------------
 
-    st.markdown("## 🚨 Quantum Threat Analysis")
+    st.markdown("## 🌐 Quantum Network Flow")
 
-    gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=error_rate,
-        title={'text': "Threat Level"},
-        gauge={
-            'axis': {'range': [0, 30]},
-            'bar': {'color': "cyan"},
-            'steps': [
-                {'range': [0, 10], 'color': '#00ff99'},
-                {'range': [10, 20], 'color': '#ffaa00'},
-                {'range': [20, 30], 'color': '#ff004c'}
-            ]
-        }
-    ))
+    G = nx.Graph()
+    G.add_edges_from([
+        ("Bank A", "Quantum Channel"),
+        ("Quantum Channel", "Bank B")
+    ])
 
-    gauge.update_layout()
-     
+    if eve:
+        G.add_node("Hacker")
+        G.add_edge("Bank A", "Hacker")
+        G.add_edge("Hacker", "Quantum Channel")
+
+    net = Network(height="400px", width="100%", bgcolor="#0b1026", font_color="white")
+
+    for n in G.nodes:
+        net.add_node(n)
+    for e in G.edges:
+        net.add_edge(e[0], e[1])
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as f:
+        net.save_graph(f.name)
+        html = open(f.name).read()
+
+    components.html(html, height=420)
+
+    # ----------------------------
+    # FINAL KEY
+    # ----------------------------
+
+    st.markdown("## 🔑 Final Shared Key")
+    st.code("".join(map(str, alice_key.tolist())))
+
+else:
+
+    st.markdown("""
+    ## 👈 How to use
+
+    1. Select number of qubits
+    2. Choose simulation mode
+    3. Click Run Simulation
+
+    This will simulate secure vs attacked quantum communication in a banking system.
+    """)
