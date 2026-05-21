@@ -1,10 +1,15 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 import random
 import plotly.graph_objects as go
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Statevector
+import networkx as nx
+from pyvis.network import Network
+import tempfile
+import os
 
 # ----------------------------------------
 # PAGE CONFIG
@@ -84,6 +89,22 @@ num_bits = st.sidebar.slider("Number of Qubits", 8, 128, 32)
 eavesdrop = st.sidebar.toggle("Enable Eavesdropper (Eve)", value=True)
 
 simulate = st.sidebar.button("🚀 Run Simulation")
+
+# ----------------------------------------
+# QUANTUM PROCESSOR STATUS
+# ----------------------------------------
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚛ Quantum Processor")
+
+cpu_load = random.randint(42, 97)
+coherence = random.randint(68, 99)
+
+st.sidebar.progress(cpu_load / 100)
+st.sidebar.caption(f"Quantum Core Utilization: {cpu_load}%")
+
+st.sidebar.progress(coherence / 100)
+st.sidebar.caption(f"Qubit Coherence Stability: {coherence}%")
 
 # ----------------------------------------
 # BB84 FUNCTIONS
@@ -218,6 +239,76 @@ if simulate:
     st.plotly_chart(fig, use_container_width=True)
 
     # ----------------------------------------
+    # QUANTUM NETWORK MAP
+    # ----------------------------------------
+
+    st.markdown("## 🌐 Quantum Communication Network")
+
+    G = nx.Graph()
+
+    G.add_node("Alice")
+    G.add_node("Quantum Channel")
+    G.add_node("Bob")
+
+    if eavesdrop:
+        G.add_node("Eve")
+        G.add_edge("Alice", "Eve")
+        G.add_edge("Eve", "Quantum Channel")
+    else:
+        G.add_edge("Alice", "Quantum Channel")
+
+    G.add_edge("Quantum Channel", "Bob")
+
+    net = Network(
+        height="500px",
+        width="100%",
+        bgcolor="#050816",
+        font_color="white"
+    )
+
+    for node in G.nodes:
+        net.add_node(node, label=node)
+
+    for edge in G.edges:
+        net.add_edge(edge[0], edge[1])
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
+        net.save_graph(tmpfile.name)
+
+        html_content = open(tmpfile.name, 'r', encoding='utf-8').read()
+
+    components.html(html_content, height=550)
+
+    # ----------------------------------------
+    # THREAT LEVEL METER
+    # ----------------------------------------
+
+    st.markdown("## 🚨 Quantum Threat Meter")
+
+    threat_fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=error_rate,
+        title={'text': "Threat Level"},
+        gauge={
+            'axis': {'range': [0, 30]},
+            'bar': {'color': "cyan"},
+            'steps': [
+                {'range': [0, 10], 'color': '#00ff99'},
+                {'range': [10, 20], 'color': '#ffaa00'},
+                {'range': [20, 30], 'color': '#ff0055'}
+            ]
+        }
+    ))
+
+    threat_fig.update_layout(
+        template="plotly_dark",
+        height=400,
+        paper_bgcolor='rgba(0,0,0,0)',
+    )
+
+    st.plotly_chart(threat_fig, use_container_width=True)
+
+    # ----------------------------------------
     # DATA TABLE
     # ----------------------------------------
 
@@ -234,69 +325,16 @@ if simulate:
     st.dataframe(df, use_container_width=True)
 
     # ----------------------------------------
-    # SECURITY ANALYSIS
+    # KEY STABILITY VISUALIZATION
     # ----------------------------------------
 
-    st.markdown("## 🛡 Security Analysis")
+    st.markdown("## 📈 Shared Key Stability")
 
-    if eavesdrop:
-        st.error(
-            "An eavesdropper measured the qubits during transmission. Due to quantum state disturbance, additional errors appeared in the shared key."
-        )
-    else:
-        st.success(
-            "No interception detected. Quantum key transmission remained stable with low disturbance."
-        )
+    key_match_progress = []
+    correct = 0
 
-    # ----------------------------------------
-    # CLASSICAL VS QUANTUM
-    # ----------------------------------------
+    for i in range(len(shared_key_alice)):
+        if shared_key_alice[i] == shared_key_bob[i]:
+            correct += 1
 
-    st.markdown("## ⚔ Classical vs Quantum Encryption")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown(
-            """
-            <div class="protocol-box">
-            <h3>Classical Communication</h3>
-            <ul>
-                <li>Copies can be intercepted invisibly</li>
-                <li>No guaranteed intrusion detection</li>
-                <li>Depends on computational difficulty</li>
-                <li>Potentially vulnerable to quantum computers</li>
-            </ul>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with col2:
-        st.markdown(
-            """
-            <div class="protocol-box">
-            <h3>Quantum Communication</h3>
-            <ul>
-                <li>Measurement disturbs qubits</li>
-                <li>Eavesdropping becomes detectable</li>
-                <li>Physics-based security</li>
-                <li>Foundation for future quantum internet</li>
-            </ul>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    # ----------------------------------------
-    # SHARED KEY DISPLAY
-    # ----------------------------------------
-
-    st.markdown("## 🔑 Final Shared Quantum Key")
-
-    key_string = ''.join(map(str, shared_key_alice.tolist()))
-
-    st.code(key_string, language='text')
-
-else:
-    st.info("Configure the simulation parameters from the sidebar and click 'Run Simulation'.")
+   
