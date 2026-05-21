@@ -312,5 +312,5 @@ if simulate:
         }
     ))
 
-    gauge.update_layout(
+    gauge.update_layout()
      
